@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:amq="http://activemq.apache.org/schema/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans     
+        http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+        http://activemq.apache.org/schema/core 
+        http://activemq.apache.org/schema/core/activemq-core.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.0.xsd
+        ">
+        <context:component-scan base-package="com.jelly.liu.mq.demo.jms.service" />
+
+        <!-- 重发策略设置 -->
+        <amq:redeliveryPolicyMap id="redeliveryPolicyMap">
+                <amq:redeliveryPolicyEntries>
+                        <amq:redeliveryPolicy topic=">" maximumRedeliveries="3" />
+                        <amq:redeliveryPolicy queue=">" maximumRedeliveries="3" />
+                </amq:redeliveryPolicyEntries>
+        </amq:redeliveryPolicyMap>
+
+        <!--active MQ 连接工厂 -->
+        <bean id="activeMQConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+                <property name="brokerURL">
+                        <value>tcp://10.10.16.235:61616</value>
+                </property>
+                <property name="RedeliveryPolicyMap" ref="redeliveryPolicyMap" />
+        </bean>
+
+        <bean id="connectionFactory" class="org.apache.activemq.pool.PooledConnectionFactory" destroy-method="stop">
+                <property name="connectionFactory" ref="activeMQConnectionFactory" />
+                <property name="maxConnections" value="100" />
+        </bean>
+
+
+        <!-- spring jms 模版 -->
+        <bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+                <property name="connectionFactory" ref="connectionFactory" />
+                <!--订阅 发布模式 -->
+                <property name="pubSubDomain" value="true" />
+        </bean>
+
+        <!-- 定义消息队列 -->
+        <bean id="testQueue" class="org.apache.activemq.command.ActiveMQQueue">
+                <constructor-arg value="mq-demo-queue-001" />
+        </bean>
+
+        <bean id="testQueueListenerContainer"
+              class="org.springframework.jms.listener.DefaultMessageListenerContainer">
+                <property name="connectionFactory" ref="connectionFactory" />
+                <property name="destination" ref="testQueue" />
+                <property name="messageListener" ref="messageReceiver" />
+                <property name="sessionTransacted" value="true" />
+        </bean>
+
+        <!-- 定义主题 -->
+        <bean id="testTopic" class="org.apache.activemq.command.ActiveMQTopic">
+                <constructor-arg value="mq-demo-topic-001" />
+        </bean>
+
+        <!-- 消息监听容器 -->
+        <bean id="testTopicListenerContainer"
+              class="org.springframework.jms.listener.DefaultMessageListenerContainer">
+                <property name="connectionFactory" ref="connectionFactory" />
+                <property name="destination" ref="testTopic" />
+                <property name="messageListener" ref="messageReceiver" />
+                <property name="sessionTransacted" value="true" />
+                <property name="clientId" value="mq-demo-001" />
+                <property name="durableSubscriptionName" value="mqDemoSub001" />
+        </bean>
+
+</beans>
